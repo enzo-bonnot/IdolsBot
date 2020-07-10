@@ -28,6 +28,19 @@ class Roll(commands.Cog):
             ctx.send("An error occurred. If this message is exceptional, "
                      "please try again. Otherwise, contact the administrator.")
 
+        # Mention users if they wish for this idol
+        id_members = DatabaseDeck.get().get_wished_by(ctx.guild.id, id_idol)
+
+        wish_msg = ''
+        for id_member in id_members:
+            member = ctx.guild.get_member(id_member)
+            # Could be None if the user left the server
+            if member:
+                wish_msg += f'{member.mention} '
+
+        if wish_msg:
+            await ctx.send(f'Wished by {wish_msg}')
+
         # Update roll information in database
         DatabaseDeck.get().update_last_roll(ctx.guild.id, ctx.author.id)
         user_nb_rolls = DatabaseDeck.get().get_nb_rolls(ctx.guild.id, ctx.author.id)
@@ -35,13 +48,12 @@ class Roll(commands.Cog):
 
         max_rolls = DatabaseDeck.get().get_rolls_per_hour(ctx.guild.id)
         if max_rolls - user_nb_rolls - 1 == 2:
-            await ctx.send(f'**{ctx.author.name}**, 2 uses left.')
+            await ctx.send(f'**{ctx.author.name if ctx.author.nick is None else ctx.author.nick}**, 2 uses left.')
 
         embed = discord.Embed(title=idol['name'], description=idol['group'], colour=secrets.randbelow(0xffffff))
         embed.set_image(url=idol['image'])
 
         id_owner = DatabaseDeck.get().idol_belongs_to(ctx.guild.id, id_idol)
-
         if id_owner:
             owner = ctx.guild.get_member(id_owner)
 
@@ -100,7 +112,7 @@ def min_until_next_claim(id_server, id_user):
     if last_claim:
         claim_interval = DatabaseDeck.get().get_server_configuration(id_server)['claim_interval']
         date_last_claim = datetime.strptime(last_claim, '%Y-%m-%d %H:%M:%S')
-        minute_since_last_claim = divmod((datetime.now() - date_last_claim).seconds, 60)[0]
+        minute_since_last_claim = int(divmod((datetime.now() - date_last_claim).total_seconds(), 60)[0])
 
         if minute_since_last_claim < claim_interval:
             time_until_claim = claim_interval - minute_since_last_claim
